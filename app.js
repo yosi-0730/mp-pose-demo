@@ -18,6 +18,48 @@ function filterValidPoses(allLandmarks, minVisible) {
   );
 }
 
+// 同一人物の重複検出を除去 (重心距離が閾値以下なら同一人物と判定)
+const DEDUP_THRESHOLD = 0.1;
+
+function deduplicatePoses(allLandmarks) {
+  if (allLandmarks.length <= 1) return allLandmarks;
+
+  const avgVis = (lms) =>
+    lms.reduce((s, lm) => s + (lm.visibility ?? 0), 0) / lms.length;
+
+  const center = (lms) => {
+    const vis = lms.filter((lm) => (lm.visibility ?? 0) >= 0.5);
+    if (vis.length === 0) return { x: 0.5, y: 0.5 };
+    return {
+      x: vis.reduce((s, lm) => s + lm.x, 0) / vis.length,
+      y: vis.reduce((s, lm) => s + lm.y, 0) / vis.length,
+    };
+  };
+
+  const centers = allLandmarks.map(center);
+  const keep = allLandmarks.map(() => true);
+
+  for (let i = 0; i < allLandmarks.length; i++) {
+    if (!keep[i]) continue;
+    for (let j = i + 1; j < allLandmarks.length; j++) {
+      if (!keep[j]) continue;
+      const dx = centers[i].x - centers[j].x;
+      const dy = centers[i].y - centers[j].y;
+      if (Math.hypot(dx, dy) < DEDUP_THRESHOLD) {
+        // 信頼度の低い方を破棄
+        if (avgVis(allLandmarks[i]) >= avgVis(allLandmarks[j])) {
+          keep[j] = false;
+        } else {
+          keep[i] = false;
+          break;
+        }
+      }
+    }
+  }
+
+  return allLandmarks.filter((_, i) => keep[i]);
+}
+
 class App {
   #video = document.getElementById('video');
   #canvas = document.getElementById('canvas');
@@ -227,10 +269,12 @@ class App {
     this.#ctx.drawImage(this.#video, 0, 0, width, height);
     this.#ctx.restore();
 
-    // 骨格検出 + ゴーストフィルタ (minVisibleLandmarks は即時反映)
+    // 骨格検出 → ゴーストフィルタ → 重複除去 (後二者は即時反映)
     const result = this.#detector.detect(this.#video, now);
     if (result !== null) {
-      const valid = filterValidPoses(result.landmarks, this.#settings.minVisibleLandmarks);
+      const valid = deduplicatePoses(
+        filterValidPoses(result.landmarks, this.#settings.minVisibleLandmarks)
+      );
       this.#lastResult = valid.length > 0 ? { landmarks: valid } : null;
       this.#peopleCount.textContent = valid.length;
     }

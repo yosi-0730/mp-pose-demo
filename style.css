@@ -280,6 +280,12 @@ body {
   cursor: pointer;
 }
 
+.setting-hint {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
 .setting-val {
   font-size: 0.78rem;
   font-weight: 600;
