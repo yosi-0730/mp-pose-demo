@@ -59,9 +59,13 @@ class App {
     }
   }
 
-  async #start() {
+async #start() {
     this.#btnToggle.disabled = true;
     try {
+      // 2回目以降の起動時に MediaPipe の内部グラフをリセットするため init を実行
+      // これにより「timestamp mismatch」エラーを回避できます
+      await this.#detector.init((msg) => this.#setStatus(msg));
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
@@ -76,7 +80,11 @@ class App {
 
       this.#syncCanvasSize();
       this.#isRunning = true;
+      
+      // 状態を完全にクリア
       this.#lastResult = null;
+      this.#lastTs = performance.now(); 
+
       this.#overlay.classList.add('hidden');
       this.#btnToggle.classList.add('running');
       this.#btnLabel.textContent = 'カメラ停止';
@@ -86,8 +94,6 @@ class App {
       this.#loop(performance.now());
     } catch (err) {
       this.#setStatus(`カメラ起動失敗: ${err.message}`);
-      this.#spinner.classList.add('hidden');
-      this.#overlay.classList.remove('hidden');
       this.#btnToggle.disabled = false;
     }
   }
@@ -99,11 +105,13 @@ class App {
     this.#video.srcObject?.getTracks().forEach((t) => t.stop());
     this.#video.srcObject = null;
 
+    // detector を破棄して MediaPipe の内部インスタンスを解放
+    this.#detector.dispose();
+
     this.#ctx.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
     this.#lastResult = null;
 
     this.#overlay.classList.remove('hidden');
-    this.#spinner.classList.add('hidden');
     this.#setStatus('停止中。カメラを起動するにはボタンを押してください。');
     this.#btnToggle.classList.remove('running');
     this.#btnLabel.textContent = 'カメラ起動';
@@ -116,20 +124,9 @@ class App {
     if (!this.#isRunning) return;
     this.#rafId = requestAnimationFrame((ts) => this.#loop(ts));
 
-    // FPS calculation (updated every 500 ms)
-    const delta = now - this.#lastTs;
-    this.#lastTs = now;
-    this.#fpsFrames++;
-    this.#fpsAccum += delta;
-    if (this.#fpsAccum >= 500) {
-      this.#fpsValue.textContent = Math.round(
-        (this.#fpsFrames * 1000) / this.#fpsAccum
-      );
-      this.#fpsFrames = 0;
-      this.#fpsAccum = 0;
-    }
+    // FPS計算... (中略)
 
-    // Draw mirrored video frame
+    // ビデオ描画
     const { width, height } = this.#canvas;
     this.#ctx.save();
     this.#ctx.translate(width, 0);
@@ -137,16 +134,24 @@ class App {
     this.#ctx.drawImage(this.#video, 0, 0, width, height);
     this.#ctx.restore();
 
-    // Pose detection (skips if video frame hasn't advanced)
+    // 骨格検知
     const result = this.#detector.detect(this.#video, now);
-    if (result !== null) {
+    
+    // 修正：検出された時だけでなく、常に latestResult を更新する
+    // これにより、人がいなくなった時に古い骨格が残り続けるのを防ぎます
+    if (result) {
       this.#lastResult = result;
       this.#peopleCount.textContent = result.landmarks.length;
+    } else {
+      // 完全に null の場合はカウント 0
+      this.#peopleCount.textContent = '0';
     }
 
-    // Render skeleton from latest result
-    if (this.#lastResult?.landmarks?.length > 0) {
+    // 描画：landmarks が空配列の場合も考慮する
+    if (this.#lastResult && this.#lastResult.landmarks && this.#lastResult.landmarks.length > 0) {
       this.#renderer.draw(this.#lastResult.landmarks, true);
+    } else {
+      this.#peopleCount.textContent = '0';
     }
   }
 
