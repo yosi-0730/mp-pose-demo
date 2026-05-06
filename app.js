@@ -5,15 +5,16 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
-// ゴースト検出フィルタ: 可視ランドマーク数が閾値未満の人物は除外
-const MIN_VISIBLE_LANDMARKS = 12;
-const LANDMARK_VISIBILITY_THRESH = 0.5;
+const DEFAULT_SETTINGS = {
+  numPoses: 5,
+  minPoseDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5,
+  minVisibleLandmarks: 12,
+};
 
-function filterValidPoses(allLandmarks) {
+function filterValidPoses(allLandmarks, minVisible) {
   return allLandmarks.filter(
-    (lms) =>
-      lms.filter((lm) => (lm.visibility ?? 0) >= LANDMARK_VISIBILITY_THRESH)
-        .length >= MIN_VISIBLE_LANDMARKS
+    (lms) => lms.filter((lm) => (lm.visibility ?? 0) >= 0.5).length >= minVisible
   );
 }
 
@@ -28,6 +29,8 @@ class App {
   #btnLabel = document.getElementById('btn-label');
   #btnIcon = document.getElementById('btn-icon');
   #btnSwitch = document.getElementById('btn-camera-switch');
+  #btnSettings = document.getElementById('btn-settings');
+  #settingsPanel = document.getElementById('settings-panel');
   #peopleCount = document.getElementById('people-count');
   #fpsValue = document.getElementById('fps-value');
 
@@ -37,7 +40,8 @@ class App {
   #isRunning = false;
   #rafId = null;
   #lastResult = null;
-  #facingMode = 'user'; // 'user' = インカメ, 'environment' = 外カメ
+  #facingMode = 'user';
+  #settings = { ...DEFAULT_SETTINGS };
 
   #fpsFrames = 0;
   #fpsAccum = 0;
@@ -46,12 +50,54 @@ class App {
   constructor() {
     this.#btnToggle.addEventListener('click', () => this.#toggle());
     this.#btnSwitch.addEventListener('click', () => this.#switchCamera());
+    this.#btnSettings.addEventListener('click', () => this.#toggleSettings());
     window.addEventListener('resize', () => this.#syncCanvasSize());
+    this.#initSettingsPanel();
+  }
+
+  #initSettingsPanel() {
+    const bind = (id, key, transform = Number) => {
+      const el = document.getElementById(id);
+      const valEl = document.getElementById(`v-${id}`);
+      el.value = this.#settings[key];
+      valEl.textContent = this.#formatVal(key, this.#settings[key]);
+      el.addEventListener('input', () => {
+        this.#settings[key] = transform(el.value);
+        valEl.textContent = this.#formatVal(key, this.#settings[key]);
+      });
+    };
+
+    bind('s-num-poses', 'numPoses');
+    bind('s-detection', 'minPoseDetectionConfidence');
+    bind('s-tracking', 'minTrackingConfidence');
+    bind('s-ghost', 'minVisibleLandmarks');
+
+    document.getElementById('btn-settings-reset').addEventListener('click', () => {
+      this.#settings = { ...DEFAULT_SETTINGS };
+      ['s-num-poses', 's-detection', 's-tracking', 's-ghost'].forEach((id) => {
+        const key = { 's-num-poses': 'numPoses', 's-detection': 'minPoseDetectionConfidence',
+          's-tracking': 'minTrackingConfidence', 's-ghost': 'minVisibleLandmarks' }[id];
+        document.getElementById(id).value = this.#settings[key];
+        document.getElementById(`v-${id}`).textContent = this.#formatVal(key, this.#settings[key]);
+      });
+    });
+  }
+
+  #formatVal(key, val) {
+    if (key === 'numPoses') return `${val} 人`;
+    if (key === 'minVisibleLandmarks') return `${val} 点`;
+    return `${Math.round(val * 100)} %`;
+  }
+
+  #toggleSettings() {
+    const open = this.#settingsPanel.classList.toggle('open');
+    this.#btnSettings.classList.toggle('active', open);
+    this.#btnSettings.setAttribute('aria-expanded', open);
   }
 
   async init() {
     try {
-      await this.#detector.init((msg) => this.#setStatus(msg));
+      await this.#detector.init((msg) => this.#setStatus(msg), this.#settings);
       this.#setStatus('カメラを起動してください');
       this.#spinner.classList.add('hidden');
       this.#btnToggle.disabled = false;
@@ -77,10 +123,12 @@ class App {
     this.#overlay.classList.remove('hidden');
     this.#setStatus('初期化中…');
 
+    // 設定パネルを閉じる
+    this.#settingsPanel.classList.remove('open');
+    this.#btnSettings.classList.remove('active');
+
     try {
-      // 毎回 reinit: MediaPipe 内部グラフのタイムスタンプをリセット
-      // (停止→再起動時の "timestamp mismatch" エラーを回避)
-      await this.#detector.init((msg) => this.#setStatus(msg));
+      await this.#detector.init((msg) => this.#setStatus(msg), this.#settings);
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -141,8 +189,6 @@ class App {
 
   async #switchCamera() {
     if (!this.#isRunning) return;
-
-    // 現在のストリームを停止 (detector は再利用せず #start で reinit)
     this.#isRunning = false;
     cancelAnimationFrame(this.#rafId);
     this.#video.srcObject?.getTracks().forEach((t) => t.stop());
@@ -170,7 +216,7 @@ class App {
       this.#fpsAccum = 0;
     }
 
-    // 映像描画: インカメはミラー表示、外カメはそのまま
+    // 映像描画
     const mirror = this.#facingMode === 'user';
     const { width, height } = this.#canvas;
     this.#ctx.save();
@@ -181,15 +227,14 @@ class App {
     this.#ctx.drawImage(this.#video, 0, 0, width, height);
     this.#ctx.restore();
 
-    // 骨格検出
+    // 骨格検出 + ゴーストフィルタ (minVisibleLandmarks は即時反映)
     const result = this.#detector.detect(this.#video, now);
     if (result !== null) {
-      const valid = filterValidPoses(result.landmarks);
+      const valid = filterValidPoses(result.landmarks, this.#settings.minVisibleLandmarks);
       this.#lastResult = valid.length > 0 ? { landmarks: valid } : null;
       this.#peopleCount.textContent = valid.length;
     }
 
-    // 骨格描画
     if (this.#lastResult?.landmarks?.length > 0) {
       this.#renderer.draw(this.#lastResult.landmarks, mirror);
     }

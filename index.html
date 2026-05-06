@@ -15,7 +15,7 @@
       <h1 class="app-title"><span class="accent">Pose</span> Detection</h1>
       <p class="app-subtitle">リアルタイム多人数骨格検出</p>
     </div>
-    <span class="version-badge">v1.1.0</span>
+    <span class="version-badge">v1.2.0</span>
   </header>
 
   <main class="main">
@@ -28,6 +28,42 @@
       </div>
     </div>
   </main>
+
+  <!-- 設定パネル (controls の直上にスライドアップ) -->
+  <div id="settings-panel" class="settings-panel" role="region" aria-label="設定">
+    <div class="settings-header">
+      <span class="settings-title">設定</span>
+      <span class="settings-note-inline">検出設定はカメラ再起動時に反映 &nbsp;|&nbsp; ゴーストフィルタは即時反映</span>
+      <button id="btn-settings-reset" class="btn-settings-reset">リセット</button>
+    </div>
+    <div class="settings-body">
+
+      <label class="setting-row">
+        <span class="setting-name">最大検出人数</span>
+        <input id="s-num-poses" type="range" min="1" max="5" step="1" value="5">
+        <span id="v-s-num-poses" class="setting-val">5 人</span>
+      </label>
+
+      <label class="setting-row">
+        <span class="setting-name">検出信頼度</span>
+        <input id="s-detection" type="range" min="0.3" max="0.9" step="0.05" value="0.5">
+        <span id="v-s-detection" class="setting-val">50 %</span>
+      </label>
+
+      <label class="setting-row">
+        <span class="setting-name">追跡信頼度</span>
+        <input id="s-tracking" type="range" min="0.3" max="0.9" step="0.05" value="0.5">
+        <span id="v-s-tracking" class="setting-val">50 %</span>
+      </label>
+
+      <label class="setting-row">
+        <span class="setting-name">ゴーストフィルタ</span>
+        <input id="s-ghost" type="range" min="0" max="20" step="1" value="12">
+        <span id="v-s-ghost" class="setting-val">12 点</span>
+      </label>
+
+    </div>
+  </div>
 
   <div class="controls">
     <button id="btn-toggle" class="btn-toggle" disabled>
@@ -48,6 +84,10 @@
         <span id="fps-value" class="stat-value">—</span>
       </div>
     </div>
+    <button id="btn-settings" class="btn-settings-toggle" aria-expanded="false" title="設定">
+      <span class="settings-icon">&#9881;</span>
+      <span class="settings-toggle-label">設定</span>
+    </button>
   </div>
 
   <footer class="footer">

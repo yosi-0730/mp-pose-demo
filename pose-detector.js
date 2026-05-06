@@ -9,7 +9,7 @@ export default class PoseDetector {
   #landmarker = null;
   #lastVideoTime = -1;
 
-  async init(onProgress) {
+  async init(onProgress, options = {}) {
     onProgress?.('MediaPipe WASM を読み込み中…');
 
     const { PoseLandmarker, FilesetResolver } = await import(
@@ -23,10 +23,10 @@ export default class PoseDetector {
 
     const baseConfig = {
       runningMode: 'VIDEO',
-      numPoses: 5,
-      minPoseDetectionConfidence: 0.5,
-      minPosePresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
+      numPoses:                    options.numPoses                    ?? 5,
+      minPoseDetectionConfidence:  options.minPoseDetectionConfidence  ?? 0.5,
+      minPosePresenceConfidence:   options.minPosePresenceConfidence   ?? 0.5,
+      minTrackingConfidence:       options.minTrackingConfidence       ?? 0.5,
     };
 
     try {
