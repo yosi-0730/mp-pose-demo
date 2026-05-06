@@ -1,0 +1,11 @@
+{
+  "name": "Pose Detection Demo",
+  "short_name": "PoseDemo",
+  "description": "リアルタイム多人数骨格検出 Web デモ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape-primary",
+  "background_color": "#0d0d1a",
+  "theme_color": "#0d0d1a"
+}

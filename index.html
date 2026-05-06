@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d0d1a">
+  <meta name="description" content="リアルタイム多人数骨格検出 Web デモ — MediaPipe Pose Landmarker">
+  <title>Pose Detection Demo</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <h1 class="app-title"><span class="accent">Pose</span> Detection</h1>
+      <p class="app-subtitle">リアルタイム多人数骨格検出</p>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="canvas-container">
+      <video id="video" playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div id="overlay" class="overlay">
+        <div class="spinner"></div>
+        <p id="status-text" class="overlay-text">初期化中…</p>
+      </div>
+    </div>
+  </main>
+
+  <div class="controls">
+    <button id="btn-toggle" class="btn-toggle" disabled>
+      <span id="btn-icon" class="btn-icon-sym">&#9654;</span>
+      <span id="btn-label">カメラ起動</span>
+    </button>
+    <div class="stats-row">
+      <div class="stat-card">
+        <span class="stat-label">検出人数</span>
+        <span id="people-count" class="stat-value">—</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">FPS</span>
+        <span id="fps-value" class="stat-value">—</span>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Powered by <a href="https://mediapipe.dev" target="_blank" rel="noopener noreferrer">MediaPipe</a>
+    &nbsp;&middot;&nbsp; Hosted on GitHub Pages
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
